@@ -8,9 +8,17 @@ extern crate serde;
 extern crate serde_json;
 extern crate thread_id;
 
+#[macro_use]
+extern crate lazy_static;
+
+use std::env;
 use std::io;
 use std::io::Write;
 use std::process;
+
+lazy_static! {
+    static ref TRACE: Option<String> = env::var("RS_TRACING").ok();
+}
 
 #[derive(Serialize)]
 enum EventType {
@@ -46,42 +54,63 @@ impl<'a> TraceEvent<'a> {
     }
 }
 
-pub struct EventGuard<'a>(TraceEvent<'a>);
+pub struct EventGuard<'a> {
+    event: Option<TraceEvent<'a>>,
+}
 
 impl<'a> EventGuard<'a> {
     fn new(name: &'a str) -> EventGuard<'a> {
-        EventGuard(TraceEvent::new(name, EventType::Complete))
+        EventGuard {
+            event: Some(TraceEvent::new(name, EventType::Complete)),
+        }
+    }
+    fn no_trace() -> EventGuard<'a> {
+        EventGuard { event: None }
     }
 }
 
 impl<'a> Drop for EventGuard<'a> {
     fn drop(&mut self) {
-        self.0.dur = Some(time::precise_time_ns() - self.0.ts);
-        print_trace_event(&self.0);
+        if let Some(ref mut event) = self.event {
+            event.dur = Some(time::precise_time_ns() - event.ts);
+            print_trace_event(&event);
+        }
     }
 }
 
 pub fn trace_scoped(name: &str) -> EventGuard {
-    EventGuard::new(name)
+    if TRACE.is_some() {
+        EventGuard::new(name)
+    } else {
+        EventGuard::no_trace()
+    }
 }
 
 pub fn trace_fn<T, F>(name: &str, function: F) -> T
 where
     F: FnOnce() -> T,
 {
-    let mut event = TraceEvent::new(name, EventType::Complete);
-    let return_value = function();
-    event.dur = Some(time::precise_time_ns() - event.ts);
-    print_trace_event(&event);
-    return_value
+    if TRACE.is_some() {
+        let mut event = TraceEvent::new(name, EventType::Complete);
+        let return_value = function();
+        event.dur = Some(time::precise_time_ns() - event.ts);
+        print_trace_event(&event);
+        return_value
+    } else {
+        function()
+    }
 }
 
 pub fn trace_begin(name: &str) {
-    trace_duration(name, EventType::DurationBegin)
+    if TRACE.is_some() {
+        trace_duration(name, EventType::DurationBegin)
+    }
 }
 
 pub fn trace_end(name: &str) {
-    trace_duration(name, EventType::DurationEnd)
+    if TRACE.is_some() {
+        trace_duration(name, EventType::DurationEnd)
+    }
 }
 
 fn print_trace_event(event: &TraceEvent) {
@@ -101,16 +130,20 @@ fn trace_duration(name: &str, event_type: EventType) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn trace_duration(name:&str) {
+        trace_begin(name);
+        trace_end(name);
+    }
 
     #[test]
     fn test_scoped_trace() {
-        trace_begin("begin");
+        trace_begin("first");
         {
             let _ = trace_scoped("complete");
+            trace_fn("trace_fn",|| trace_duration("trace_fn_fn"));
             let _ = trace_scoped("complete2");
-            trace_begin("begin2");
-            trace_end("end2");
+            trace_duration("duration");
         }
-        trace_end("end");
+        trace_end("first");
     }
 }
