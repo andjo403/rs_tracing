@@ -8,6 +8,8 @@ extern crate serde;
 extern crate serde_json;
 extern crate thread_id;
 
+use std::io;
+use std::io::Write;
 use std::process;
 
 #[derive(Serialize)]
@@ -34,7 +36,7 @@ struct TraceEvent<'a> {
 impl<'a> TraceEvent<'a> {
     fn new(name: &'a str, event_type: EventType) -> Self {
         TraceEvent {
-            name: name,
+            name,
             ph: event_type,
             ts: time::precise_time_ns(),
             pid: process::id(),
@@ -59,11 +61,12 @@ impl<'a> Drop for EventGuard<'a> {
     }
 }
 
-pub fn trace_scoped<'a>(name: &'a str) -> EventGuard<'a> {
+pub fn trace_scoped(name: &str) -> EventGuard {
     EventGuard::new(name)
 }
 
-pub fn trace_fn<T, F>(name: &str, function: F) -> T where
+pub fn trace_fn<T, F>(name: &str, function: F) -> T
+where
     F: FnOnce() -> T,
 {
     let mut event = TraceEvent::new(name, EventType::Complete);
@@ -82,7 +85,12 @@ pub fn trace_end(name: &str) {
 }
 
 fn print_trace_event(event: &TraceEvent) {
-    println!("{},", serde_json::to_string(&event).unwrap());
+    let mut json_buffer = Vec::with_capacity(256);
+    serde_json::to_writer(&mut json_buffer, event).unwrap();
+    let stdout = io::stdout();
+    let mut lock = stdout.lock();
+    lock.write(&json_buffer).unwrap();
+    lock.write(b",\n").unwrap();
 }
 
 fn trace_duration(name: &str, event_type: EventType) {
