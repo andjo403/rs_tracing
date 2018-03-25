@@ -54,18 +54,19 @@ impl<'a> TraceEvent<'a> {
     }
 }
 
-pub struct EventGuard<'a> {
+struct EventGuard<'a> {
     event: Option<TraceEvent<'a>>,
 }
 
 impl<'a> EventGuard<'a> {
     fn new(name: &'a str) -> EventGuard<'a> {
-        EventGuard {
-            event: Some(TraceEvent::new(name, EventType::Complete)),
+        if TRACE.is_some() {
+            EventGuard {
+                event: Some(TraceEvent::new(name, EventType::Complete)),
+            }
+        } else {
+            EventGuard { event: None }
         }
-    }
-    fn no_trace() -> EventGuard<'a> {
-        EventGuard { event: None }
     }
 }
 
@@ -78,27 +79,19 @@ impl<'a> Drop for EventGuard<'a> {
     }
 }
 
-pub fn trace_scoped(name: &str) -> EventGuard {
-    if TRACE.is_some() {
-        EventGuard::new(name)
-    } else {
-        EventGuard::no_trace()
-    }
+#[macro_export]
+macro_rules! trace_scoped {
+    ($name: expr) => {
+        let _guard = $crate::EventGuard::new($name);
+    };
 }
 
 pub fn trace_fn<T, F>(name: &str, function: F) -> T
 where
     F: FnOnce() -> T,
 {
-    if TRACE.is_some() {
-        let mut event = TraceEvent::new(name, EventType::Complete);
-        let return_value = function();
-        event.dur = Some(time::precise_time_ns() - event.ts);
-        print_trace_event(&event);
-        return_value
-    } else {
-        function()
-    }
+    trace_scoped!(name);
+    function()
 }
 
 pub fn trace_begin(name: &str) {
@@ -130,20 +123,19 @@ fn trace_duration(name: &str, event_type: EventType) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn trace_duration(name:&str) {
+    fn trace_duration(name: &str) -> u32{
         trace_begin(name);
         trace_end(name);
+        42
     }
 
     #[test]
     fn test_scoped_trace() {
-        trace_begin("first");
+        trace_scoped!("complete");
         {
-            let _ = trace_scoped("complete");
-            trace_fn("trace_fn",|| trace_duration("trace_fn_fn"));
-            let _ = trace_scoped("complete2");
+            let resut = trace_fn("trace_fn", || trace_duration("trace_fn_fn"));
+            assert_eq!(resut, 42);
             trace_duration("duration");
         }
-        trace_end("first");
     }
 }
