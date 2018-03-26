@@ -111,8 +111,8 @@ fn print_trace_event(event: &TraceEvent) {
     serde_json::to_writer(&mut json_buffer, event).unwrap();
     let stdout = io::stdout();
     let mut lock = stdout.lock();
-    lock.write(&json_buffer).unwrap();
-    lock.write(b",\n").unwrap();
+    lock.write_all(&json_buffer).unwrap();
+    lock.write_all(b",\n").unwrap();
 }
 
 fn trace_duration(name: &str, event_type: EventType) {
