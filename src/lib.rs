@@ -18,7 +18,7 @@ use std::io::Write;
 use std::process;
 
 lazy_static! {
-    static ref TRACE: Option<String> = env::var("RS_TRACING").ok();
+    static ref TRACE: Option<&'static str> = option_env!("RS_TRACING");
 }
 
 #[derive(Serialize)]
