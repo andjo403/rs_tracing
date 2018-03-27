@@ -34,11 +34,11 @@ pub enum EventType {
 pub struct TraceEvent<'a> {
     name: &'a str,
     ph: EventType,
-    ts: u64,
+    pub ts: u64,
     pid: u32,
     tid: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
-    dur: Option<u64>,
+    pub dur: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     args: Option<serde_json::Value>,
 }
