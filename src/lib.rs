@@ -48,7 +48,7 @@ impl<'a> TraceEvent<'a> {
         TraceEvent {
             name,
             ph: event_type,
-            ts: time::precise_time_ns(),
+            ts: precise_time_ms(),
             pid: process::id(),
             tid: thread_id::get(),
             dur: None,
@@ -58,27 +58,21 @@ impl<'a> TraceEvent<'a> {
 }
 
 struct EventGuard<'a> {
-    event: Option<TraceEvent<'a>>,
+    event: TraceEvent<'a>,
 }
 
 impl<'a> EventGuard<'a> {
-    fn new_trace_on(name: &'a str, args: Option<serde_json::Value>) -> EventGuard<'a> {
+    fn new(name: &'a str, args: Option<serde_json::Value>) -> EventGuard<'a> {
         EventGuard {
-            event: Some(TraceEvent::new(name, EventType::Complete, args)),
+            event: TraceEvent::new(name, EventType::Complete, args),
         }
-    }
-
-    fn new_trace_off() -> EventGuard<'a> {
-        EventGuard { event: None }
     }
 }
 
 impl<'a> Drop for EventGuard<'a> {
     fn drop(&mut self) {
-        if let Some(ref mut event) = self.event {
-            event.dur = Some(time::precise_time_ns() - event.ts);
-            print_trace_event(&event);
-        }
+        self.event.dur = Some(precise_time_ms() - self.event.ts);
+        print_trace_event(&self.event);
     }
 }
 
@@ -86,16 +80,16 @@ impl<'a> Drop for EventGuard<'a> {
 macro_rules! trace_scoped {
     ($name: expr) => {
         let _guard = if $crate::TRACE.is_some(){
-            $crate::EventGuard::new_trace_on($name, None)
+            Some($crate::EventGuard::new($name, None))
         }else{
-            $crate::EventGuard::new_trace_off()
+            None
         };
     };
     ($name: expr, $($json:tt)+) =>{
         let _guard = if $crate::TRACE.is_some(){
-            $crate::EventGuard::new_trace_on($name, Some(json!({$($json)+})))
+            Some($crate::EventGuard::new($name, Some(json!({$($json)+}))))
         }else{
-            $crate::EventGuard::new_trace_off()
+            None
         };
     }
 }
@@ -106,7 +100,7 @@ macro_rules! trace_fn {
         if $crate::TRACE.is_some() {
             let mut event = $crate::TraceEvent::new($name, $crate::EventType::Complete, None);
             let result = $function;
-            event.dur = Some($crate::time::precise_time_ns() - event.ts);
+            event.dur = Some($crate::precise_time_ms() - event.ts);
             $crate::print_trace_event(&event);
             result
         }else{
@@ -117,7 +111,7 @@ macro_rules! trace_fn {
         if $crate::TRACE.is_some() {
             let mut event = $crate::TraceEvent::new($name, $crate::EventType::Complete, Some(json!({$($json)+})));
             let result = $function;
-            event.dur = Some($crate::time::precise_time_ns() - event.ts);
+            event.dur = Some($crate::precise_time_ms() - event.ts);
             $crate::print_trace_event(&event);
             result
         }else{
@@ -167,10 +161,15 @@ fn print_trace_event(event: &TraceEvent) {
     lock.write_all(b",\n").unwrap();
 }
 
+fn precise_time_ms() -> u64 {
+    time::precise_time_ns()/1000_000
+}
+
 #[cfg(test)]
 mod tests {
 
     fn trace_duration(name: &str) -> u32 {
+        //trace_scoped!("lessComplete");
         trace_begin!(name,"code": 200,"success": true,);
         trace_end!(name);
         42
