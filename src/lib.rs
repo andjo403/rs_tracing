@@ -70,7 +70,7 @@ impl<'a> EventGuard<'a> {
 }
 
 impl<'a> Drop for EventGuard<'a> {
-    pub fn drop(&mut self) {
+    fn drop(&mut self) {
         self.event.dur = Some(precise_time_ms() - self.event.ts);
         print_trace_event(&self.event);
     }
