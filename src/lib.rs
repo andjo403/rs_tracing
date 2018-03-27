@@ -17,11 +17,11 @@ use std::io::Write;
 use std::process;
 
 lazy_static! {
-    static ref TRACE: Option<&'static str> = option_env!("RS_TRACING");
+    pub static ref TRACE: Option<&'static str> = option_env!("RS_TRACING");
 }
 
 #[derive(Serialize)]
-enum EventType {
+pub enum EventType {
     #[serde(rename = "B")]
     DurationBegin,
     #[serde(rename = "E")]
@@ -31,7 +31,7 @@ enum EventType {
 }
 
 #[derive(Serialize)]
-struct TraceEvent<'a> {
+pub struct TraceEvent<'a> {
     name: &'a str,
     ph: EventType,
     ts: u64,
@@ -44,7 +44,7 @@ struct TraceEvent<'a> {
 }
 
 impl<'a> TraceEvent<'a> {
-    fn new(name: &'a str, event_type: EventType, args: Option<serde_json::Value>) -> Self {
+    pub fn new(name: &'a str, event_type: EventType, args: Option<serde_json::Value>) -> Self {
         TraceEvent {
             name,
             ph: event_type,
@@ -57,12 +57,12 @@ impl<'a> TraceEvent<'a> {
     }
 }
 
-struct EventGuard<'a> {
+pub struct EventGuard<'a> {
     event: TraceEvent<'a>,
 }
 
 impl<'a> EventGuard<'a> {
-    fn new(name: &'a str, args: Option<serde_json::Value>) -> EventGuard<'a> {
+    pub fn new(name: &'a str, args: Option<serde_json::Value>) -> EventGuard<'a> {
         EventGuard {
             event: TraceEvent::new(name, EventType::Complete, args),
         }
@@ -70,7 +70,7 @@ impl<'a> EventGuard<'a> {
 }
 
 impl<'a> Drop for EventGuard<'a> {
-    fn drop(&mut self) {
+    pub fn drop(&mut self) {
         self.event.dur = Some(precise_time_ms() - self.event.ts);
         print_trace_event(&self.event);
     }
@@ -152,7 +152,7 @@ macro_rules! trace_end {
     }
 }
 
-fn print_trace_event(event: &TraceEvent) {
+pub fn print_trace_event(event: &TraceEvent) {
     let mut json_buffer = Vec::with_capacity(256);
     serde_json::to_writer(&mut json_buffer, event).unwrap();
     let stdout = io::stdout();
@@ -161,7 +161,7 @@ fn print_trace_event(event: &TraceEvent) {
     lock.write_all(b",\n").unwrap();
 }
 
-fn precise_time_ms() -> u64 {
+pub fn precise_time_ms() -> u64 {
     time::precise_time_ns()/1000_000
 }
 
