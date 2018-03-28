@@ -1,11 +1,12 @@
 #![feature(getpid)]
+#![feature(macro_reexport)]
 
 extern crate time;
 #[macro_use]
 extern crate serde_derive;
 
 extern crate serde;
-#[macro_use]
+#[macro_reexport(json,json_internal)]
 extern crate serde_json;
 extern crate thread_id;
 
