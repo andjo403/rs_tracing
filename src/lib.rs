@@ -2,8 +2,6 @@
 #![feature(macro_reexport)]
 
 extern crate time;
-#[macro_use]
-extern crate serde_derive;
 
 extern crate serde;
 #[macro_reexport(json,json_internal)]
@@ -16,32 +14,59 @@ extern crate lazy_static;
 use std::io;
 use std::io::Write;
 use std::process;
+use serde::ser::{Serialize, Serializer, SerializeStruct};
+
 
 lazy_static! {
     pub static ref TRACE: Option<&'static str> = option_env!("RS_TRACING");
 }
 
-#[derive(Serialize)]
 pub enum EventType {
-    #[serde(rename = "B")]
     DurationBegin,
-    #[serde(rename = "E")]
     DurationEnd,
-    #[serde(rename = "X")]
     Complete,
 }
 
-#[derive(Serialize)]
+impl Serialize for EventType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        match *self {
+            EventType::DurationBegin => serializer.serialize_unit_variant("EventType", 0, "B"),
+            EventType::DurationEnd => serializer.serialize_unit_variant("EventType", 1, "E"),
+            EventType::Complete => serializer.serialize_unit_variant("EventType", 2, "X"),
+        }
+    }
+}
+
 pub struct TraceEvent<'a> {
     name: &'a str,
     ph: EventType,
     pub ts: u64,
     pid: u32,
     tid: usize,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub dur: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     args: Option<serde_json::Value>,
+}
+
+impl<'a> Serialize for TraceEvent<'a> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        let mut event = serializer.serialize_struct("TraceEvent", 7)?;
+        event.serialize_field("name", &self.name)?;
+        event.serialize_field("ph", &self.ph)?;
+        event.serialize_field("ts", &self.ts)?;
+        event.serialize_field("pid", &self.pid)?;
+        event.serialize_field("tid", &self.tid)?;
+        if let Some(ref dur) =  self.dur {
+            event.serialize_field("dur", &dur)?;
+        }
+        if let Some(ref args) =  self.args {
+            event.serialize_field("args", &args)?;
+        }
+        event.end()
+    }
 }
 
 impl<'a> TraceEvent<'a> {
@@ -171,7 +196,7 @@ mod tests {
 
     fn trace_duration(name: &str) -> u32 {
         //trace_scoped!("lessComplete");
-        trace_begin!(name,"code": 200,"success": true,);
+        trace_begin!(name);
         trace_end!(name);
         42
     }
@@ -180,7 +205,7 @@ mod tests {
     fn test_scoped_trace() {
         trace_scoped!("complete");
         {
-            let resut = trace_fn!("trace_fn", trace_duration("trace_fn_fn"),"code":100);
+            let resut = trace_fn!("trace_fn", trace_duration("trace_fn_fn"));
             assert_eq!(resut, 42);
             trace_duration("duration");
         }
