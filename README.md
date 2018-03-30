@@ -2,7 +2,7 @@ Traces to Chrome's [trace_event format](https://docs.google.com/document/d/1CvAC
 
 # Usage
     trace_scoped!("complete");
-    trace_fn!("trace_fn", trace_duration("trace_fn_fn"));
+    trace_expr!("trace_expr", trace_duration("trace_expr_expr"));
     trace_begin("duration");
     trace_end("duration");
 also possible to add cusomt data to all the macros formated like the serde::Json! macro

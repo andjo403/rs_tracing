@@ -121,7 +121,7 @@ macro_rules! trace_scoped {
 }
 
 #[macro_export]
-macro_rules! trace_fn {
+macro_rules! trace_expr {
     ($name: expr, $function: expr) => {
         if $crate::TRACE.is_some() {
             let mut event = $crate::TraceEvent::new($name, $crate::EventType::Complete, None);
@@ -205,7 +205,7 @@ mod tests {
     fn test_scoped_trace() {
         trace_scoped!("complete");
         {
-            let resut = trace_fn!("trace_fn", trace_duration("trace_fn_fn"));
+            let resut = trace_expr!("trace_expr", trace_duration("trace_expr_expr"));
             assert_eq!(resut, 42);
             trace_duration("duration");
         }
