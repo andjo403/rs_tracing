@@ -66,7 +66,7 @@ impl<'a> TraceEvent<'a> {
         TraceEvent {
             name,
             ph: event_type,
-            ts: precise_time_ms(),
+            ts: precise_time_microsec(),
             pid: process::id(),
             tid: thread_id::get(),
             dur: None,
@@ -89,7 +89,7 @@ impl<'a> EventGuard<'a> {
 
 impl<'a> Drop for EventGuard<'a> {
     fn drop(&mut self) {
-        self.event.dur = Some(precise_time_ms() - self.event.ts);
+        self.event.dur = Some(precise_time_microsec() - self.event.ts);
         print_trace_event(&self.event);
     }
 }
@@ -118,7 +118,7 @@ macro_rules! trace_expr {
         if $cond {
             let mut event = $crate::TraceEvent::new($name, $crate::EventType::Complete, None);
             let result = $function;
-            event.dur = Some($crate::precise_time_ms() - event.ts);
+            event.dur = Some($crate::precise_time_microsec() - event.ts);
             $crate::print_trace_event(&event);
             result
         }else{
@@ -129,7 +129,7 @@ macro_rules! trace_expr {
         if $cond {
             let mut event = $crate::TraceEvent::new($name, $crate::EventType::Complete, Some(json!({$($json)+})));
             let result = $function;
-            event.dur = Some($crate::precise_time_ms() - event.ts);
+            event.dur = Some($crate::precise_time_microsec() - event.ts);
             $crate::print_trace_event(&event);
             result
         }else{
@@ -179,8 +179,8 @@ pub fn print_trace_event(event: &TraceEvent) {
     lock.write_all(b",\n").unwrap();
 }
 
-pub fn precise_time_ms() -> u64 {
-    time::precise_time_ns()/1000_000
+pub fn precise_time_microsec() -> u64 {
+    time::precise_time_ns()/1000
 }
 
 #[cfg(test)]
