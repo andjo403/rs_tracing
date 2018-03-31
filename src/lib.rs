@@ -8,18 +8,10 @@ extern crate serde;
 extern crate serde_json;
 extern crate thread_id;
 
-#[macro_use]
-extern crate lazy_static;
-
 use std::io;
 use std::io::Write;
 use std::process;
 use serde::ser::{Serialize, Serializer, SerializeStruct};
-
-
-lazy_static! {
-    pub static ref TRACE: Option<&'static str> = option_env!("RS_TRACING");
-}
 
 pub enum EventType {
     DurationBegin,
@@ -104,15 +96,15 @@ impl<'a> Drop for EventGuard<'a> {
 
 #[macro_export]
 macro_rules! trace_scoped {
-    ($name: expr) => {
-        let _guard = if $crate::TRACE.is_some(){
+    ($cond:expr, $name: expr) => {
+        let _guard = if $cond {
             Some($crate::EventGuard::new($name, None))
         }else{
             None
         };
     };
-    ($name: expr, $($json:tt)+) =>{
-        let _guard = if $crate::TRACE.is_some(){
+    ($cond:expr, $name: expr, $($json:tt)+) =>{
+        let _guard = if $cond {
             Some($crate::EventGuard::new($name, Some(json!({$($json)+}))))
         }else{
             None
@@ -122,8 +114,8 @@ macro_rules! trace_scoped {
 
 #[macro_export]
 macro_rules! trace_expr {
-    ($name: expr, $function: expr) => {
-        if $crate::TRACE.is_some() {
+    ($cond:expr, $name: expr, $function: expr) => {
+        if $cond {
             let mut event = $crate::TraceEvent::new($name, $crate::EventType::Complete, None);
             let result = $function;
             event.dur = Some($crate::precise_time_ms() - event.ts);
@@ -133,8 +125,8 @@ macro_rules! trace_expr {
             $function
         }
     };
-    ($name: expr, $function: expr, $($json:tt)+) =>{
-        if $crate::TRACE.is_some() {
+    ($cond:expr, $name: expr, $function: expr, $($json:tt)+) =>{
+        if $cond {
             let mut event = $crate::TraceEvent::new($name, $crate::EventType::Complete, Some(json!({$($json)+})));
             let result = $function;
             event.dur = Some($crate::precise_time_ms() - event.ts);
@@ -148,14 +140,14 @@ macro_rules! trace_expr {
 
 #[macro_export]
 macro_rules! trace_begin {
-    ($name: expr) => {
-        if $crate::TRACE.is_some() {
+    ($cond:expr, $name: expr) => {
+        if $cond {
             let event = $crate::TraceEvent::new($name, $crate::EventType::DurationBegin, None);
             $crate::print_trace_event(&event);
         }
     };
-    ($name: expr, $($json:tt)+) =>{
-        if $crate::TRACE.is_some() {
+    ($cond:expr, $name: expr, $($json:tt)+) =>{
+        if $cond {
             let event = $crate::TraceEvent::new($name, $crate::EventType::DurationBegin, Some(json!({$($json)+})));
             $crate::print_trace_event(&event);
         }
@@ -164,14 +156,14 @@ macro_rules! trace_begin {
 
 #[macro_export]
 macro_rules! trace_end {
-    ($name: expr) => {
-        if $crate::TRACE.is_some() {
+    ($cond:expr, $name: expr) => {
+        if $cond {
             let event = $crate::TraceEvent::new($name, $crate::EventType::DurationEnd, None);
             $crate::print_trace_event(&event);
         }
     };
-    ($name: expr, $($json:tt)+) =>{
-        if $crate::TRACE.is_some() {
+    ($cond:expr, $name: expr, $($json:tt)+) =>{
+        if $cond {
             let event = $crate::TraceEvent::new($name, $crate::EventType::DurationEnd, Some(json!({$($json)+})));
             $crate::print_trace_event(&event);
         }
@@ -196,16 +188,16 @@ mod tests {
 
     fn trace_duration(name: &str) -> u32 {
         //trace_scoped!("lessComplete");
-        trace_begin!(name);
-        trace_end!(name);
+        trace_begin!(true,name);
+        trace_end!(true,name);
         42
     }
 
     #[test]
     fn test_scoped_trace() {
-        trace_scoped!("complete");
+        trace_scoped!(true,"complete");
         {
-            let resut = trace_expr!("trace_expr", trace_duration("trace_expr_expr"));
+            let resut = trace_expr!(true,"trace_expr", trace_duration("trace_expr_expr"));
             assert_eq!(resut, 42);
             trace_duration("duration");
         }
