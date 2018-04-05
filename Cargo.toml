@@ -2,6 +2,11 @@
 name = "rs_tracing"
 version = "0.1.0"
 authors = ["Andreas Jonson"]
+readme = "README.md"
+license = "MIT"
+description = "a crate that outputs trace events in the trace event format"
+repository = "https://github.com/andjo403/rs_tracing.git"
+keywords = ["profiler", "trace"]
 
 [dependencies]
 serde_json = "1.0"
