@@ -13,7 +13,7 @@ extern crate time;
 extern crate serde;
 extern crate serde_json;
 
-use std::io{self, Write};
+use std::io::{self, Write};
 use std::process;
 use std::thread::{self, ThreadId};
 use serde::ser::{Serialize, Serializer, SerializeStruct};
