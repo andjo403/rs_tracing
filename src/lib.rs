@@ -10,14 +10,12 @@
 #![feature(use_extern_macros)]
 
 extern crate time;
-
 extern crate serde;
 extern crate serde_json;
-extern crate thread_id;
 
-use std::io;
-use std::io::Write;
+use std::io{self, Write};
 use std::process;
+use std::thread::{self, ThreadId};
 use serde::ser::{Serialize, Serializer, SerializeStruct};
 
 #[doc(hidden)]
@@ -49,7 +47,7 @@ pub struct TraceEvent<'a> {
     ph: EventType,
     pub ts: u64,
     pid: u32,
-    tid: usize,
+    tid: u64,
     pub dur: Option<u64>,
     args: Option<serde_json::Value>,
 }
@@ -83,7 +81,10 @@ impl<'a> TraceEvent<'a> {
             ph: event_type,
             ts: precise_time_microsec(),
             pid: process::id(),
-            tid: thread_id::get(),
+            tid: unsafe {
+                // only want an unique identifier per thread think this is ok.
+                std::mem::transmute::<ThreadId, u64>(thread::current().id())
+            },
             dur: None,
             args,
         }
