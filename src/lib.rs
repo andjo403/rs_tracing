@@ -1,10 +1,17 @@
+//! rs_tracing is a crate that outputs trace events in the [trace event format]
+//! that is used by chrome://tracing the output can also be converted to html
+//! with [trace2html]
+//! 
+//! [trace2html]: https://github.com/catapult-project/catapult/blob/master/tracing/README.md
+//! [trace event format]: https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/preview#
+//!
+
 #![feature(getpid)]
-#![feature(macro_reexport)]
+#![feature(use_extern_macros)]
 
 extern crate time;
 
 extern crate serde;
-#[macro_reexport(json,json_internal)]
 extern crate serde_json;
 extern crate thread_id;
 
@@ -13,6 +20,10 @@ use std::io::Write;
 use std::process;
 use serde::ser::{Serialize, Serializer, SerializeStruct};
 
+#[doc(hidden)]
+pub use serde_json::{json, json_internal};
+
+#[doc(hidden)]
 pub enum EventType {
     DurationBegin,
     DurationEnd,
@@ -20,6 +31,7 @@ pub enum EventType {
 }
 
 impl Serialize for EventType {
+    #[doc(hidden)]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
@@ -31,6 +43,7 @@ impl Serialize for EventType {
     }
 }
 
+#[doc(hidden)]
 pub struct TraceEvent<'a> {
     name: &'a str,
     ph: EventType,
@@ -42,6 +55,7 @@ pub struct TraceEvent<'a> {
 }
 
 impl<'a> Serialize for TraceEvent<'a> {
+    #[doc(hidden)]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
@@ -62,6 +76,7 @@ impl<'a> Serialize for TraceEvent<'a> {
 }
 
 impl<'a> TraceEvent<'a> {
+    #[doc(hidden)]
     pub fn new(name: &'a str, event_type: EventType, args: Option<serde_json::Value>) -> Self {
         TraceEvent {
             name,
@@ -75,11 +90,13 @@ impl<'a> TraceEvent<'a> {
     }
 }
 
+#[doc(hidden)]
 pub struct EventGuard<'a> {
     event: TraceEvent<'a>,
 }
 
 impl<'a> EventGuard<'a> {
+    #[doc(hidden)]
     pub fn new(name: &'a str, args: Option<serde_json::Value>) -> EventGuard<'a> {
         EventGuard {
             event: TraceEvent::new(name, EventType::Complete, args),
@@ -88,12 +105,45 @@ impl<'a> EventGuard<'a> {
 }
 
 impl<'a> Drop for EventGuard<'a> {
+    #[doc(hidden)]
     fn drop(&mut self) {
         self.event.dur = Some(precise_time_microsec() - self.event.ts);
         print_trace_event(&self.event);
     }
 }
 
+
+/// Trace time used from invocation until end of current scope.
+/// The event type is [Complete Event (X)] with start time and duration.
+/// 
+/// $cond: condition if tracing is active or not.
+/// 
+/// $name: name of the trace event.
+/// 
+/// $json: optional custom data formated as serdes [json] macro.
+/// 
+/// [Complete Event (X)]: https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/preview#heading=h.lpfof2aylapb
+/// [json]: https://docs.serde.rs/serde_json/macro.json.html
+/// # Examples
+///
+/// ```
+/// # #[macro_use] extern crate rs_tracing;
+/// # fn main() {
+/// {
+/// trace_scoped!(true,"event name");
+/// println!("this is timed");
+/// }
+/// # }
+/// ```
+/// ```
+/// # #[macro_use] extern crate rs_tracing;
+/// # fn main() {
+/// {
+/// trace_scoped!(true,"event name","custom":"data","u32":4);
+/// println!("this is timed");
+/// }
+/// # }
+/// ```
 #[macro_export]
 macro_rules! trace_scoped {
     ($cond:expr, $name: expr) => {
@@ -112,32 +162,91 @@ macro_rules! trace_scoped {
     }
 }
 
+/// trace time used for expression to finish.
+/// The event type is [Complete Event (X)] with start time and duration.
+/// 
+/// $cond: condition if tracing is active or not.
+/// 
+/// $name: name of the trace event.
+/// 
+/// $expr: expression to trace.
+/// 
+/// $json: optional custom data formated as serdes [json] macro.
+/// 
+/// [Complete Event (X)]: https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/preview#heading=h.lpfof2aylapb
+/// [json]: https://docs.serde.rs/serde_json/macro.json.html
+/// # Examples
+///
+/// ```
+/// # #[macro_use] extern crate rs_tracing;
+/// # fn main() {
+/// trace_expr!(true,"event name", println!("this is timed"));
+/// # }
+/// ```
+/// ```
+/// # #[macro_use] extern crate rs_tracing;
+/// # fn main() {
+/// trace_expr!(true,"event name",println!("this is timed"),"custom":"data","u32":4);
+/// # }
+/// ```
 #[macro_export]
 macro_rules! trace_expr {
-    ($cond:expr, $name: expr, $function: expr) => {
+    ($cond:expr, $name: expr, $expr: expr) => {
         if $cond {
             let mut event = $crate::TraceEvent::new($name, $crate::EventType::Complete, None);
-            let result = $function;
+            let result = $expr;
             event.dur = Some($crate::precise_time_microsec() - event.ts);
             $crate::print_trace_event(&event);
             result
         }else{
-            $function
+            $expr
         }
     };
-    ($cond:expr, $name: expr, $function: expr, $($json:tt)+) =>{
+    ($cond:expr, $name: expr, $expr: expr, $($json:tt)+) =>{
         if $cond {
             let mut event = $crate::TraceEvent::new($name, $crate::EventType::Complete, Some(json!({$($json)+})));
-            let result = $function;
+            let result = $expr;
             event.dur = Some($crate::precise_time_microsec() - event.ts);
             $crate::print_trace_event(&event);
             result
         }else{
-            $function
+            $expr
         }
     }
 }
 
+/// Mark beginning of event, needs to be followed by corresponding trace_end.
+/// The event type is [Duration Event (B)] with an instant time.
+/// Start and end of the event must be on the same thread.
+/// If you provide custom data to both the trace_begin and trace_end then 
+/// the arguments will be merged.
+/// 
+/// $cond: condition if tracing is active or not.
+/// 
+/// $name: name of the trace event.
+/// 
+/// $json: optional custom data formated as serdes [json] macro.
+/// 
+/// [Duration Event (B)]: https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/preview#heading=h.nso4gcezn7n1
+/// [json]: https://docs.serde.rs/serde_json/macro.json.html
+/// # Examples
+///
+/// ```
+/// # #[macro_use] extern crate rs_tracing;
+/// # fn main() {
+/// trace_begin!(true,"event name");
+/// println!("this is timed");
+/// trace_end!(true,"event name");
+/// # }
+/// ```
+/// ```
+/// # #[macro_use] extern crate rs_tracing;
+/// # fn main() {
+/// trace_begin!(true,"event name","custom":"data");
+/// println!("this is timed");
+/// trace_end!(true,"event name","u32":4);
+/// # }
+/// ```
 #[macro_export]
 macro_rules! trace_begin {
     ($cond:expr, $name: expr) => {
@@ -154,6 +263,38 @@ macro_rules! trace_begin {
     }
 }
 
+/// Mark end of event, needs to be proceeded by corresponding trace_begin.
+/// The event type is [Duration Event (E)] with an instant time.
+/// Start and end of the event must be on the same thread.
+/// If you provide custom data to both the trace_begin and trace_end then 
+/// the arguments will be merged.
+/// 
+/// $cond: condition if tracing is active or not.
+/// 
+/// $name: name of the trace event.
+/// 
+/// $json: optional custom data formated as serdes [json] macro.
+///
+/// [Duration Event (E)]: https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/preview#heading=h.nso4gcezn7n1
+/// [json]: https://docs.serde.rs/serde_json/macro.json.html
+/// # Examples
+///
+/// ```
+/// # #[macro_use] extern crate rs_tracing;
+/// # fn main() {
+/// trace_begin!(true,"event name");
+/// println!("this is timed");
+/// trace_end!(true,"event name");
+/// # }
+/// ```
+/// ```
+/// # #[macro_use] extern crate rs_tracing;
+/// # fn main() {
+/// trace_begin!(true,"event name","custom":"data");
+/// println!("this is timed");
+/// trace_end!(true,"event name","u32":4);
+/// # }
+/// ```
 #[macro_export]
 macro_rules! trace_end {
     ($cond:expr, $name: expr) => {
@@ -170,6 +311,7 @@ macro_rules! trace_end {
     }
 }
 
+#[doc(hidden)]
 pub fn print_trace_event(event: &TraceEvent) {
     let mut json_buffer = Vec::with_capacity(256);
     serde_json::to_writer(&mut json_buffer, event).unwrap();
@@ -179,27 +321,7 @@ pub fn print_trace_event(event: &TraceEvent) {
     lock.write_all(b",\n").unwrap();
 }
 
+#[doc(hidden)]
 pub fn precise_time_microsec() -> u64 {
     time::precise_time_ns()/1000
-}
-
-#[cfg(test)]
-mod tests {
-
-    fn trace_duration(name: &str) -> u32 {
-        //trace_scoped!("lessComplete");
-        trace_begin!(true,name);
-        trace_end!(true,name);
-        42
-    }
-
-    #[test]
-    fn test_scoped_trace() {
-        trace_scoped!(true,"complete");
-        {
-            let resut = trace_expr!(true,"trace_expr", trace_duration("trace_expr_expr"));
-            assert_eq!(resut, 42);
-            trace_duration("duration");
-        }
-    }
 }
