@@ -15,6 +15,9 @@ extern crate time;
 extern crate serde;
 #[cfg(feature = "rs_tracing")]
 extern crate serde_json;
+#[doc(hidden)]
+#[cfg(feature = "rs_tracing")]
+pub use serde_json::{json, json_internal};
 
 #[doc(hidden)]
 pub use internal::*;
@@ -78,13 +81,15 @@ macro_rules! trace_scoped {
 /// ```
 /// # #[macro_use] extern crate rs_tracing;
 /// # fn main() {
-/// trace_expr!(true,"event name", println!("this is timed"));
+/// let result = trace_expr!(true,"event name", { println!("this is timed"); true});
+/// assert!(result, "result wasn't true!");
 /// # }
 /// ```
 /// ```
 /// # #[macro_use] extern crate rs_tracing;
 /// # fn main() {
-/// trace_expr!(true,"event name",println!("this is timed"),"custom":"data","u32":4);
+/// let result = trace_expr!(true,"event name",{ println!("this is timed"); true},"custom":"data","u32":4);
+/// assert!(result, "result wasn't true!");
 /// # }
 /// ```
 #[macro_export]
@@ -183,9 +188,6 @@ macro_rules! trace_end {
 
 #[cfg(feature = "rs_tracing")]
 mod internal {
-
-#[doc(hidden)]
-pub use serde_json::{json, json_internal};
 
 use std::io::{self, Write};
 use std::process;
@@ -380,7 +382,12 @@ macro_rules! trace_scoped_internal {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! trace_expr_internal {
-    ($($some:tt)+) =>{};
+    ($cond:expr, $name: expr, $expr: expr) => {
+            $expr
+    };
+    ($cond:expr, $name: expr, $expr: expr, $($json:tt)+) =>{
+            $expr
+    }
 }
 
 #[doc(hidden)]
