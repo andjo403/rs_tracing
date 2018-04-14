@@ -58,6 +58,37 @@ macro_rules! trace_deactivate {
     };
 }
 
+/// opens trace file
+/// # Examples
+///
+/// ```
+/// # #[macro_use] extern crate rs_tracing;
+/// # fn main() {
+/// {
+/// open_trace_file!("/tmp");
+/// {
+///     trace_scoped!("event name");
+///     println!("this is timed");
+/// }
+/// close_trace_file!();
+/// }
+/// # }
+/// ```
+#[macro_export]
+macro_rules! open_trace_file {
+    ($dir: expr) => {
+        trace_to_file_internal!($dir)
+    };
+}
+
+/// closes trace file
+#[macro_export]
+macro_rules! close_trace_file {
+    () => {
+        close_trace_file_internal!()
+    };
+}
+
 /// Trace time used from invocation until end of current scope.
 /// The event type is [Complete Event (X)] with start time and duration.
 ///
@@ -219,48 +250,34 @@ mod internal {
 
     use serde::ser::{Serialize, SerializeStruct, Serializer};
     use serde_json;
-    use std::io::{self, Write};
+    use std::io::Write;
     use std::mem::transmute;
     use std::process;
     use std::thread::{self, ThreadId};
     use time;
+
+    use std::fs::File;
+    use std::path::{Path, PathBuf};
+    use std::sync::Mutex;
 
     pub enum TraceState {
         InActive,
         Active,
     }
 
-    pub static mut TRACER: &'static Trace = &StdoutTracer;
+    pub static mut TRACER: Option<Mutex<File>> = None;
     pub static mut TRACE_STATE: &'static TraceState = &TraceState::Active;
 
-    pub trait Trace: Sync + Send {
-        /// trace shall only be called if trace is wanted.
-        fn trace(&self, event: &TraceEvent);
-    }
-
-    struct StdoutTracer;
-
-    impl Trace for StdoutTracer {
-        fn trace(&self, event: &TraceEvent) {
-            let mut json_buffer = Vec::with_capacity(256);
-            serde_json::to_writer(&mut json_buffer, event).unwrap();
-            let stdout = io::stdout();
-            let mut lock = stdout.lock();
-            lock.write_all(&json_buffer).unwrap();
-            lock.write_all(b",\n").unwrap();
-        }
-    }
-
-    pub fn set_tracer(tracer: &'static Trace) {
+    pub fn trace(event: &TraceEvent) {
         unsafe {
-            TRACER = tracer;
+            if let Some(ref mut file) = TRACER {
+                let mut file = file.lock().unwrap();
+                serde_json::to_writer(&mut *file, event).unwrap();
+                file.write_all(b",\n").unwrap();
+            }
         }
     }
 
-    /// Returns a reference to the tracer.
-    pub fn tracer() -> &'static Trace {
-        unsafe { TRACER }
-    }
 
     pub fn set_trace_state(state: &'static TraceState) {
         unsafe {
@@ -367,9 +384,33 @@ mod internal {
         #[doc(hidden)]
         fn drop(&mut self) {
             self.event.dur = Some(precise_time_microsec() - self.event.ts);
-            tracer().trace(&self.event);
+            trace(&self.event);
         }
     }
+
+
+    pub fn init_trace_to_file<P: AsRef<Path>>(dir: P) {
+        let mut path = PathBuf::new();
+        path.push(dir);
+        path.push(process::id().to_string());
+        path.set_extension("trace");
+        let mut file = File::create(path).unwrap();
+        file.write_all(b"[").unwrap();
+        let file = Mutex::new(file);
+        unsafe {
+            TRACER = Some(file);
+        }
+    }
+
+    pub fn close_trace_file_fn() {
+        unsafe {
+            if let Some(ref mut file) = TRACER {
+                let mut file = file.lock().unwrap();
+                (*file).flush().unwrap();
+            }
+        }
+    }
+
 
     #[doc(hidden)]
     pub fn precise_time_microsec() -> u64 {
@@ -381,6 +422,22 @@ mod internal {
     macro_rules! trace_state_change {
         ($state: expr) => {
             $crate::set_trace_state($state)
+        };
+    }
+
+    #[doc(hidden)]
+    #[macro_export]
+    macro_rules! trace_to_file_internal {
+        ($dir: expr) => {
+            $crate::init_trace_to_file($dir);
+        };
+    }
+
+    #[doc(hidden)]
+    #[macro_export]
+    macro_rules! close_trace_file_internal {
+        () => {
+            $crate::close_trace_file_fn();
         };
     }
 
@@ -411,7 +468,7 @@ mod internal {
             let mut event = $crate::TraceEvent::new($name, $crate::EventType::Complete, None);
             let result = $expr;
             event.dur = Some($crate::precise_time_microsec() - event.ts);
-            $crate::tracer().trace(&event);
+            $crate::trace(&event);
             result
         }else{
             $expr
@@ -422,7 +479,7 @@ mod internal {
             let mut event = $crate::TraceEvent::new($name, $crate::EventType::Complete, Some(json!({$($json)+})));
             let result = $expr;
             event.dur = Some($crate::precise_time_microsec() - event.ts);
-            $crate::tracer().trace(&event);
+            $crate::trace(&event);
             result
         }else{
             $expr
@@ -436,13 +493,13 @@ mod internal {
     ($name: expr, $event_type: expr) => {
         if $crate::is_trace_active() {
             let event = $crate::TraceEvent::new($name, $event_type, None);
-            $crate::tracer().trace(&event);
+            $crate::trace(&event);
         }
     };
     ($name: expr, $event_type: expr, $($json:tt)+) =>{
         if $crate::is_trace_active() {
             let event = $crate::TraceEvent::new($name, $event_type, Some(json!({$($json)+})));
-            $crate::tracer().trace(&event);
+            $crate::trace(&event);
         }
     }
 }
@@ -455,6 +512,18 @@ mod internal {
     #[macro_export]
     macro_rules! trace_state_change {
         ($state: expr) => {};
+    }
+
+    #[doc(hidden)]
+    #[macro_export]
+    macro_rules! trace_to_file_internal {
+        ($dir: expr) => {};
+    }
+
+    #[doc(hidden)]
+    #[macro_export]
+    macro_rules! close_trace_file_internal {
+        () => {};
     }
 
     #[doc(hidden)]
