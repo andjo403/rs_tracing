@@ -409,6 +409,7 @@ mod internal {
                 let mut file = file.lock().unwrap();
                 (*file).flush().unwrap();
             }
+            TRACER = None;
         }
     }
 
