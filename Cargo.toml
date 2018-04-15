@@ -8,6 +8,9 @@ description = "a crate that outputs trace events in the trace event format"
 repository = "https://github.com/andjo403/rs_tracing.git"
 keywords = ["profiler", "trace"]
 
+[lib]
+crate-types = ["rlib", "dylib"]
+
 [dependencies]
 serde_json = { version = "1.0", optional = true }
 serde = { version = "1.0", optional = true }
