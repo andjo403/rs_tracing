@@ -250,7 +250,7 @@ mod internal {
 
     use serde::ser::{Serialize, SerializeStruct, Serializer};
     use serde_json;
-    use std::io::Write;
+    use std::io::{Write, BufWriter};
     use std::mem::transmute;
     use std::process;
     use std::thread::{self, ThreadId};
@@ -265,7 +265,7 @@ mod internal {
         Active,
     }
 
-    pub static mut TRACER: Option<Mutex<File>> = None;
+    pub static mut TRACER: Option<Mutex<BufWriter<File>>> = None;
     pub static mut TRACE_STATE: &'static TraceState = &TraceState::Active;
 
     pub fn trace(event: &TraceEvent) {
@@ -394,9 +394,10 @@ mod internal {
         path.push(dir);
         path.push(process::id().to_string());
         path.set_extension("trace");
-        let mut file = File::create(path).unwrap();
-        file.write_all(b"[").unwrap();
-        let file = Mutex::new(file);
+        let file = File::create(path).unwrap();
+        let mut writer = BufWriter::new(file);
+        writer.write_all(b"[").unwrap();
+        let file = Mutex::new(writer);
         unsafe {
             TRACER = Some(file);
         }
