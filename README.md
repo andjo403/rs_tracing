@@ -15,9 +15,6 @@ this is the code that is tested in rustdoc and the example is repeated 181 times
     /// #     x + 1
     /// # }
     /// ```
-    pub fn add_one(x: i32) -> i32 {
-        x + 1
-    }
 ```
 * [default (RUST_TEST_THREADS=32)](rustdoc32.html)
 * [RUST_TEST_THREADS=6](rustdoc6.html)
