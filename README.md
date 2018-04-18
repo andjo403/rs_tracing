@@ -10,7 +10,7 @@ I only get the generated html to work in chrome
 * [release build of ripgrep](ripgrep_release.html)
 
 # Example traces rustdoc on a 32 threads cpu
-this is the code that is tested in rustdoc and the example is repeated 181 times
+this is the code that is tested in rustdoc and the example is repeated 42 times
 ```rust
     /// ```
     /// let five = 5;
