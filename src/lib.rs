@@ -58,7 +58,7 @@ macro_rules! trace_deactivate {
     };
 }
 
-/// opens trace file
+/// opens a new trace file with the name <pid>.trace in the dir specified.
 /// # Examples
 ///
 /// ```
@@ -82,6 +82,7 @@ macro_rules! open_trace_file {
 }
 
 /// closes trace file
+/// note will not trace the trace_scoped trace if called from the same scope. 
 #[macro_export]
 macro_rules! close_trace_file {
     () => {
