@@ -1,7 +1,10 @@
 example traces generated with trace2html from [catapult project](https://github.com/catapult-project/catapult)
 
 I only get the generated html to work in chrome
-# Example traces rustc incremental builds on a 32 threads cpu
+# Example traces rustc initial incremental build on a 32 threads cpu
+* [build of ripgrep](ripgrep_inc.html)
+* [release build of ripgrep](ripgrep_release_inc.html)
+# Example traces rustc build on a 32 threads cpu
 * [build of ripgrep](ripgrep.html)
 * [release build of ripgrep](ripgrep_release.html)
 # Example traces rustdoc on a 32 threads cpu
