@@ -76,13 +76,13 @@ macro_rules! trace_deactivate {
 /// ```
 #[macro_export]
 macro_rules! open_trace_file {
-    ($dir: expr) => {
+    ($dir:expr) => {
         trace_to_file_internal!($dir)
     };
 }
 
 /// closes trace file
-/// note will not trace the trace_scoped trace if called from the same scope. 
+/// note will not trace the trace_scoped trace if called from the same scope.
 #[macro_export]
 macro_rules! close_trace_file {
     () => {
@@ -251,13 +251,13 @@ mod internal {
 
     use serde::ser::{Serialize, SerializeStruct, Serializer};
     use serde_json;
-    use std::io::{Write, BufWriter};
+    use std::io::{self, BufWriter, Write};
     use std::mem::transmute;
     use std::process;
     use std::thread::{self, ThreadId};
     use time;
 
-    use std::fs::File;
+    use std::fs::{DirBuilder, File};
     use std::path::{Path, PathBuf};
     use std::sync::Mutex;
 
@@ -278,7 +278,6 @@ mod internal {
             }
         }
     }
-
 
     pub fn set_trace_state(state: &'static TraceState) {
         unsafe {
@@ -389,19 +388,23 @@ mod internal {
         }
     }
 
-
-    pub fn init_trace_to_file<P: AsRef<Path>>(dir: P) {
-        let mut path = PathBuf::new();
-        path.push(dir);
-        path.push(process::id().to_string());
-        path.set_extension("trace");
-        let file = File::create(path).unwrap();
+    pub fn init_trace_to_file<P: AsRef<Path>>(dir: P) -> io::Result<()> {
+        let mut dir_path = PathBuf::new();
+        dir_path.push(dir);
+        let mut file_path = dir_path.clone();
+        file_path.push(process::id().to_string());
+        file_path.set_extension("trace");
+        let file = DirBuilder::new()
+            .recursive(true)
+            .create(dir_path)
+            .and(File::create(file_path))?;
         let mut writer = BufWriter::new(file);
-        writer.write_all(b"[").unwrap();
+        writer.write_all(b"[")?;
         let file = Mutex::new(writer);
         unsafe {
             TRACER = Some(file);
         }
+        Ok(())
     }
 
     pub fn close_trace_file_fn() {
@@ -414,7 +417,6 @@ mod internal {
         }
     }
 
-
     #[doc(hidden)]
     pub fn precise_time_microsec() -> u64 {
         time::precise_time_ns() / 1000
@@ -423,7 +425,7 @@ mod internal {
     #[doc(hidden)]
     #[macro_export]
     macro_rules! trace_state_change {
-        ($state: expr) => {
+        ($state:expr) => {
             $crate::set_trace_state($state)
         };
     }
@@ -431,8 +433,8 @@ mod internal {
     #[doc(hidden)]
     #[macro_export]
     macro_rules! trace_to_file_internal {
-        ($dir: expr) => {
-            $crate::init_trace_to_file($dir);
+        ($dir:expr) => {
+            $crate::init_trace_to_file($dir)
         };
     }
 
@@ -514,13 +516,13 @@ mod internal {
     #[doc(hidden)]
     #[macro_export]
     macro_rules! trace_state_change {
-        ($state: expr) => {};
+        ($state:expr) => {};
     }
 
     #[doc(hidden)]
     #[macro_export]
     macro_rules! trace_to_file_internal {
-        ($dir: expr) => {};
+        ($dir:expr) => {};
     }
 
     #[doc(hidden)]
@@ -532,16 +534,16 @@ mod internal {
     #[doc(hidden)]
     #[macro_export]
     macro_rules! trace_scoped_internal {
-        ($($some: tt)+) => {};
+        ($($some:tt)+) => {};
     }
 
     #[doc(hidden)]
     #[macro_export]
     macro_rules! trace_expr_internal {
-        ($name: expr, $expr: expr) => {
+        ($name:expr, $expr:expr) => {
             $expr
         };
-        ($name: expr, $expr: expr, $($json: tt)+) => {
+        ($name:expr, $expr:expr, $($json:tt)+) => {
             $expr
         };
     }
@@ -549,6 +551,6 @@ mod internal {
     #[doc(hidden)]
     #[macro_export]
     macro_rules! trace_duration_internal {
-        ($($some: tt)+) => {};
+        ($($some:tt)+) => {};
     }
 } // mod internal
