@@ -6,8 +6,6 @@
 //! [trace event format]: https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/preview#
 //!
 
-#![feature(use_extern_macros)]
-
 #[cfg(feature = "rs_tracing")]
 extern crate serde;
 #[cfg(feature = "rs_tracing")]
