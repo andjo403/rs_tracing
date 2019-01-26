@@ -62,7 +62,7 @@ macro_rules! trace_deactivate {
     };
 }
 
-/// opens a new trace file with the name \<pid\>.trace in the dir specified.
+/// Activates trace and opens a new trace file with the name \<pid\>.trace in the dir specified.
 ///
 /// # Examples
 ///
@@ -277,7 +277,7 @@ mod internal {
     }
 
     pub static mut TRACER: Option<Mutex<BufWriter<File>>> = None;
-    pub static mut TRACE_STATE: &'static TraceState = &TraceState::Active;
+    pub static mut TRACE_STATE: &'static TraceState = &TraceState::InActive;
 
     pub fn trace(event: &TraceEvent) {
         unsafe {
@@ -414,6 +414,7 @@ mod internal {
         unsafe {
             TRACER = Some(file);
         }
+        set_trace_state(&TraceState::Active);
         Ok(())
     }
 
