@@ -70,7 +70,7 @@ macro_rules! trace_deactivate {
 /// # #[macro_use] extern crate rs_tracing;
 /// # fn main() {
 /// {
-/// open_trace_file!("/tmp");
+/// open_trace_file!("/tmp").unwrap();
 /// {
 ///     trace_scoped!("event name");
 ///     println!("this is timed");
@@ -533,7 +533,10 @@ mod internal {
     #[doc(hidden)]
     #[macro_export]
     macro_rules! trace_to_file_internal {
-        ($dir:expr) => {};
+        ($dir:expr) => {{
+            let result: std::io::Result<()> = Ok(());
+            result
+        }};
     }
 
     #[doc(hidden)]
