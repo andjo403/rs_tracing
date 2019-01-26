@@ -1,10 +1,11 @@
 [package]
 name = "rs_tracing"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["Andreas Jonson"]
 readme = "README.md"
 license = "MIT"
-description = "a crate that outputs trace events in the trace event format"
+description = "trace events in the trace event format"
+documentation = "https://docs.rs/rs_tracing/"
 repository = "https://github.com/andjo403/rs_tracing.git"
 keywords = ["profiler", "trace"]
 

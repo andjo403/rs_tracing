@@ -1,4 +1,4 @@
-//! rs_tracing is a crate that outputs trace events in the [trace event format]
+//! rs_tracing is a crate that outputs trace events to a file in the [trace event format]
 //! that is used by chrome://tracing the output can also be converted to html
 //! with [trace2html]
 //!
@@ -20,6 +20,7 @@ pub use serde_json::{json, json_internal};
 pub use internal::*;
 
 /// Activate tracing
+///
 /// # Examples
 ///
 /// ```
@@ -38,6 +39,7 @@ macro_rules! trace_activate {
 }
 
 /// Deactivate tracing
+///
 /// # Examples
 ///
 /// ```
@@ -55,7 +57,8 @@ macro_rules! trace_deactivate {
     };
 }
 
-/// opens a new trace file with the name <pid>.trace in the dir specified.
+/// opens a new trace file with the name \<pid\>.trace in the dir specified.
+///
 /// # Examples
 ///
 /// ```
@@ -79,7 +82,8 @@ macro_rules! open_trace_file {
 }
 
 /// closes trace file
-/// note will not trace the trace_scoped trace if called from the same scope.
+///
+/// note will not trace the trace_scoped end trace if called from the same scope.
 #[macro_export]
 macro_rules! close_trace_file {
     () => {
@@ -88,6 +92,7 @@ macro_rules! close_trace_file {
 }
 
 /// Trace time used from invocation until end of current scope.
+///
 /// The event type is [Complete Event (X)] with start time and duration.
 ///
 /// $name: name of the trace event.
@@ -127,6 +132,7 @@ macro_rules! trace_scoped {
 }
 
 /// trace time used for expression to finish.
+///
 /// The event type is [Complete Event (X)] with start time and duration.
 ///
 /// $name: name of the trace event.
@@ -164,6 +170,7 @@ macro_rules! trace_expr {
 }
 
 /// Mark beginning of event, needs to be followed by corresponding trace_end.
+///
 /// The event type is [Duration Event (B)] with an instant time.
 /// Start and end of the event must be on the same thread.
 /// If you provide custom data to both the trace_begin and trace_end then
@@ -204,6 +211,7 @@ macro_rules! trace_begin {
 }
 
 /// Mark end of event, needs to be proceeded by corresponding trace_begin.
+///
 /// The event type is [Duration Event (E)] with an instant time.
 /// Start and end of the event must be on the same thread.
 /// If you provide custom data to both the trace_begin and trace_end then
