@@ -1,6 +1,11 @@
-//! rs_tracing is a crate that outputs trace events to a file in the [trace event format]
-//! that is used by chrome://tracing the output can also be converted to html
-//! with [trace2html]
+//! rs_tracing is a crate that outputs trace events to a file in the [trace event format].
+//!
+//! This format is used by chrome://tracing the output can also be converted to html
+//! with [trace2html].
+//!
+//! If the feature rs_tracing is not set in the toml file the macros expand to nothing,
+//! with the exception of trace_expr that will still execute the expression,
+//! also all crate dependencies of rs_tracing will be removed.
 //!
 //! [trace2html]: https://github.com/catapult-project/catapult/blob/master/tracing/README.md
 //! [trace event format]: https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/preview#

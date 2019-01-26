@@ -18,6 +18,7 @@ fn main() {
         trace_end!("duration");
     }
     close_trace_file!();
+}
 ```
 also possible to add custom data to all the macros formated like
 the [serde_json::json!](https://docs.serde.rs/serde_json/macro.json.html) macro e.g.
