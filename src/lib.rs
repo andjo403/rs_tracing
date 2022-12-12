@@ -329,10 +329,10 @@ mod internal {
     pub struct TraceEvent<'a> {
         name: &'a str,
         ph: EventType,
-        pub ts: u64,
+        pub ts: i128,
         pid: u32,
         tid: u64,
-        pub dur: Option<u64>,
+        pub dur: Option<i128>,
         args: Option<serde_json::Value>,
     }
 
@@ -393,7 +393,7 @@ mod internal {
     impl<'a> Drop for EventGuard<'a> {
         #[doc(hidden)]
         fn drop(&mut self) {
-            self.event.dur = Some(precise_time_microsec() - self.event.ts);
+            self.event.dur = Some(std::cmp::max(0, precise_time_microsec() - self.event.ts));
             trace(&self.event);
         }
     }
@@ -429,8 +429,8 @@ mod internal {
     }
 
     #[doc(hidden)]
-    pub fn precise_time_microsec() -> u64 {
-        time::precise_time_ns() / 1000
+    pub fn precise_time_microsec() -> i128 {
+        (time::OffsetDateTime::now_utc() - time::OffsetDateTime::UNIX_EPOCH).whole_milliseconds()
     }
 
     #[doc(hidden)]
@@ -519,7 +519,6 @@ mod internal {
         }
     }
 }
-
 } // mod internal
 
 #[cfg(not(feature = "rs_tracing"))]
