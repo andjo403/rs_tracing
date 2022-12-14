@@ -15,8 +15,6 @@
 extern crate serde;
 #[cfg(feature = "rs_tracing")]
 extern crate serde_json;
-#[cfg(feature = "rs_tracing")]
-extern crate time;
 #[doc(hidden)]
 #[cfg(feature = "rs_tracing")]
 pub use serde_json::{json, json_internal};
@@ -261,11 +259,12 @@ mod internal {
 
     use serde::ser::{Serialize, SerializeStruct, Serializer};
     use serde_json;
+    use std::convert::TryInto;
     use std::io::{self, BufWriter, Write};
     use std::mem::transmute;
     use std::process;
     use std::thread::{self, ThreadId};
-    use time;
+    use std::time::SystemTime;
 
     use std::fs::{DirBuilder, File};
     use std::path::{Path, PathBuf};
@@ -329,10 +328,10 @@ mod internal {
     pub struct TraceEvent<'a> {
         name: &'a str,
         ph: EventType,
-        pub ts: i128,
+        pub ts: u64,
         pid: u32,
         tid: u64,
-        pub dur: Option<i128>,
+        pub dur: Option<u64>,
         args: Option<serde_json::Value>,
     }
 
@@ -429,8 +428,13 @@ mod internal {
     }
 
     #[doc(hidden)]
-    pub fn precise_time_microsec() -> i128 {
-        (time::OffsetDateTime::now_utc() - time::OffsetDateTime::UNIX_EPOCH).whole_milliseconds()
+    pub fn precise_time_microsec() -> u64 {
+        SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .expect("SystemTime is before UNIX EPOCH")
+            .as_millis()
+            .try_into()
+            .expect("Duration to large to be be represented")
     }
 
     #[doc(hidden)]
