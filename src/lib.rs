@@ -259,7 +259,6 @@ mod internal {
 
     use serde::ser::{Serialize, SerializeStruct, Serializer};
     use serde_json;
-    use std::convert::TryInto;
     use std::fs::{DirBuilder, File};
     use std::io::{self, BufWriter, Write};
     use std::mem::transmute;
@@ -324,10 +323,10 @@ mod internal {
     pub struct TraceEvent<'a> {
         name: &'a str,
         ph: EventType,
-        pub ts: u64,
+        pub ts: u128,
         pid: u32,
         tid: u64,
-        pub dur: Option<u64>,
+        pub dur: Option<u128>,
         args: Option<serde_json::Value>,
     }
 
@@ -388,7 +387,7 @@ mod internal {
     impl<'a> Drop for EventGuard<'a> {
         #[doc(hidden)]
         fn drop(&mut self) {
-            self.event.dur = Some(std::cmp::max(0, precise_time_microsec() - self.event.ts));
+            self.event.dur = Some(precise_time_microsec().saturating_sub(self.event.ts));
             trace(&self.event);
         }
     }
@@ -420,13 +419,11 @@ mod internal {
     }
 
     #[doc(hidden)]
-    pub fn precise_time_microsec() -> u64 {
+    pub fn precise_time_microsec() -> u128 {
         SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .expect("SystemTime is before UNIX EPOCH")
-            .as_millis()
-            .try_into()
-            .expect("Duration to large to be be represented")
+            .as_micros()
     }
 
     #[doc(hidden)]
