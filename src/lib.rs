@@ -260,28 +260,29 @@ mod internal {
     use serde::ser::{Serialize, SerializeStruct, Serializer};
     use serde_json;
     use std::convert::TryInto;
+    use std::fs::{DirBuilder, File};
     use std::io::{self, BufWriter, Write};
     use std::mem::transmute;
+    use std::path::{Path, PathBuf};
     use std::process;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Mutex;
     use std::thread::{self, ThreadId};
     use std::time::SystemTime;
 
-    use std::fs::{DirBuilder, File};
-    use std::path::{Path, PathBuf};
-    use std::sync::Mutex;
-
+    #[derive(PartialEq)]
     pub enum TraceState {
         InActive,
         Active,
     }
 
-    pub static mut TRACER: Option<Mutex<BufWriter<File>>> = None;
-    pub static mut TRACE_STATE: &'static TraceState = &TraceState::InActive;
+    static mut TRACER: Mutex<Option<BufWriter<File>>> = Mutex::new(None);
+    static mut TRACE_ACTIVE: AtomicBool = AtomicBool::new(false);
 
     pub fn trace(event: &TraceEvent) {
         unsafe {
-            if let Some(ref mut file) = TRACER {
-                let mut file = file.lock().unwrap();
+            let mut tracer = TRACER.lock().unwrap();
+            if let Some(ref mut file) = *tracer {
                 serde_json::to_writer(&mut *file, event).unwrap();
                 file.write_all(b",\n").unwrap();
             }
@@ -290,17 +291,12 @@ mod internal {
 
     pub fn set_trace_state(state: &'static TraceState) {
         unsafe {
-            TRACE_STATE = state;
+            TRACE_ACTIVE.store(*state == TraceState::Active, Ordering::SeqCst);
         }
     }
 
     pub fn is_trace_active() -> bool {
-        unsafe {
-            if let TraceState::Active = *TRACE_STATE {
-                return true;
-            }
-            false
-        }
+        unsafe { TRACE_ACTIVE.load(Ordering::SeqCst) }
     }
 
     #[doc(hidden)]
@@ -398,6 +394,7 @@ mod internal {
     }
 
     pub fn init_trace_to_file<P: AsRef<Path>>(dir: P) -> io::Result<()> {
+        let mut tracer = unsafe { TRACER.lock().unwrap() };
         let mut dir_path = PathBuf::new();
         dir_path.push(dir);
         let mut file_path = dir_path.clone();
@@ -409,22 +406,17 @@ mod internal {
             .and(File::create(file_path))?;
         let mut writer = BufWriter::new(file);
         writer.write_all(b"[")?;
-        let file = Mutex::new(writer);
-        unsafe {
-            TRACER = Some(file);
-        }
+        *tracer = Some(writer);
         set_trace_state(&TraceState::Active);
         Ok(())
     }
 
     pub fn close_trace_file_fn() {
-        unsafe {
-            if let Some(ref mut file) = TRACER {
-                let mut file = file.lock().unwrap();
-                (*file).flush().unwrap();
-            }
-            TRACER = None;
+        let mut tracer = unsafe { TRACER.lock().unwrap() };
+        if let Some(ref mut file) = *tracer {
+            (*file).flush().unwrap();
         }
+        *tracer = None;
     }
 
     #[doc(hidden)]
