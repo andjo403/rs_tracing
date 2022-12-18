@@ -15,8 +15,6 @@
 extern crate serde;
 #[cfg(feature = "rs_tracing")]
 extern crate serde_json;
-#[cfg(feature = "rs_tracing")]
-extern crate time;
 #[doc(hidden)]
 #[cfg(feature = "rs_tracing")]
 pub use serde_json::{json, json_internal};
@@ -261,11 +259,12 @@ mod internal {
 
     use serde::ser::{Serialize, SerializeStruct, Serializer};
     use serde_json;
+    use std::convert::TryInto;
     use std::io::{self, BufWriter, Write};
     use std::mem::transmute;
     use std::process;
     use std::thread::{self, ThreadId};
-    use time;
+    use std::time::SystemTime;
 
     use std::fs::{DirBuilder, File};
     use std::path::{Path, PathBuf};
@@ -393,7 +392,7 @@ mod internal {
     impl<'a> Drop for EventGuard<'a> {
         #[doc(hidden)]
         fn drop(&mut self) {
-            self.event.dur = Some(precise_time_microsec() - self.event.ts);
+            self.event.dur = Some(std::cmp::max(0, precise_time_microsec() - self.event.ts));
             trace(&self.event);
         }
     }
@@ -430,7 +429,12 @@ mod internal {
 
     #[doc(hidden)]
     pub fn precise_time_microsec() -> u64 {
-        time::precise_time_ns() / 1000
+        SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .expect("SystemTime is before UNIX EPOCH")
+            .as_millis()
+            .try_into()
+            .expect("Duration to large to be be represented")
     }
 
     #[doc(hidden)]
@@ -519,7 +523,6 @@ mod internal {
         }
     }
 }
-
 } // mod internal
 
 #[cfg(not(feature = "rs_tracing"))]
